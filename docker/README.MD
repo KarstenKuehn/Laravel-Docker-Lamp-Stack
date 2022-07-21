@@ -4,9 +4,9 @@
 
 - Apache2 Webserver
 - PHP
-- Mysql
-- Supervisor
-- Cron
+- Datenbank (Mysql)
+- Laravel Queue (Supervisor)
+- Laravel Schedule (Cron)
 
 
 ## Struktur
