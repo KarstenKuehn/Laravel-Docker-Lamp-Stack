@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+
+  database:
+    image: mysql:8
+    container_name: database
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - database:/var/lib/mysql
+    networks:
+      - laravel
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-p${DB_ROOT_PASSWORD}" ]
+      retries: 3
+      timeout: 5s
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: phpmyadmin
+    environment:
+      - PMA_ARBITRARY=1
+      - UPLOAD_LIMIT=10G
+      - MEMORY_LIMIT=1G
+      - MAX_EXECUTION_TIME=3600
+      - HIDE_PHP_VERSION=true
+      - PMA_HOST=database
+      - PMA_USER=${DB_USERNAME}
+      - PMA_PASSWORD=${DB_PASSWORD}
+      - PMA_PORT=${DB_PORT}
+    restart: always
+    depends_on:
+      - database
+    ports:
+      - "8888:80"
+    networks:
+      - laravel
+
+  webserver:
+    build:
+      context: ./docker/configs
+      dockerfile: webserver.dockerfile
+    container_name: webserver
+    working_dir: /var/www/html
+    depends_on:
+      - database
+    volumes:
+      - ./src:/var/www/html
+      - ./docker/logs/webserver/:/var/log/apache2/
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - laravel
+
+  artisan:
+    build:
+      context: ./docker/configs
+      dockerfile: ./php.dockerfile
+    container_name: artisan
+    volumes:
+      - ./src:/var/www/html
+    working_dir: /var/www/html
+    networks:
+      - laravel
+    depends_on:
+      - webserver
+      - database
+    entrypoint: [ 'php', '/var/www/html/artisan' ]
+
+  cron:
+    build:
+      context: ./docker/configs
+      dockerfile: ./php.dockerfile
+    container_name: cron
+    volumes:
+      - ./src:/var/www/html
+      - ./docker/logs/cron:/var/log/cron
+    networks:
+      - laravel
+    depends_on:
+      - database
+      - webserver
+      - artisan
+    command: [ 'cron', '&&', 'tail', '-f', '/var/log/cron/laravel-scheduler.log' ]
+
+  supervisord:
+    build:
+      context: ./docker/configs
+      dockerfile: ./php.dockerfile
+    container_name: supervisord
+    volumes:
+      - ./src:/var/www/html
+      - ./docker/logs/supervisor:/var/log/supervisor
+    networks:
+      - laravel
+    depends_on:
+      - database
+      - webserver
+      - artisan
+    command: [ '/usr/bin/supervisord', '-n', '-c', '/etc/supervisor/supervisord.conf' ]
+
+  node:
+    build:
+      context: ./docker/configs
+      dockerfile: ./node.dockerfile
+    container_name: node
+    working_dir: /var/www/html
+    volumes:
+      - ./src:/var/www/html
+    networks:
+      - laravel
+
+  composer:
+    image: composer:latest
+    container_name: composer
+    volumes:
+      - ./src:/var/www/html
+    working_dir: /var/www/html
+    networks:
+      - laravel
+
+volumes:
+  database:
+
+networks:
+  laravel:
