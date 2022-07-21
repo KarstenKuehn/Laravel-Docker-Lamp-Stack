@@ -219,7 +219,7 @@ docker compose --env-file ./src/.env run --rm artisan migrate:status
 `run` Optionen in der package.json beachten!
 
 ```bash
-docker compose --env-file ./src/.env run --rm npm
+docker compose --env-file ./src/.env run --rm node npm
 ```
 ```bash
 docker compose --env-file ./src/.env run --rm node npm <command>
